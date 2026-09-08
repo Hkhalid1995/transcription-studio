@@ -1,0 +1,12 @@
+.DS_Store
+.qa_cache/
+__pycache__/
+*.pyc
+.env
+.env.*
+.streamlit/secrets.toml
+venv/
+.venv/
+node_modules/
+dist/
+build/
