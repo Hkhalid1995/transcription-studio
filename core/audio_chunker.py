@@ -1,5 +1,6 @@
 import subprocess
 import os
+import re
 import tempfile
 import pandas as pd
 from typing import List, Dict, Any
@@ -27,15 +28,15 @@ def format_seconds_to_tc(seconds: float, fps: float = 24.0) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}:{f:02d}"
 
 def get_audio_duration(audio_path: str) -> float:
-    """Gets total audio duration via ffprobe."""
-    cmd = [
-        "ffprobe", "-v", "error", "-show_entries",
-        "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
-        audio_path
-    ]
+    """Gets total audio duration by decoding with ffmpeg and reading its final timestamp."""
+    cmd = ["ffmpeg", "-i", audio_path, "-f", "null", "-"]
     try:
-        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
-        return float(res.stdout.strip())
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        matches = re.findall(r"time=(\d+):(\d+):(\d+\.?\d*)", res.stderr)
+        if not matches:
+            return 0.0
+        h, m, s = matches[-1]
+        return int(h) * 3600 + int(m) * 60 + float(s)
     except Exception:
         return 0.0
 

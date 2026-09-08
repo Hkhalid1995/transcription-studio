@@ -1,7 +1,6 @@
-import static_ffmpeg
-import static_ffmpeg.run as _sf_run
-_sf_run.LOCK_FILE = "/tmp/static_ffmpeg.lock"
-static_ffmpeg.add_paths(download_dir="/tmp/static_ffmpeg")
+import os
+import imageio_ffmpeg
+os.environ["PATH"] = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe()) + os.pathsep + os.environ.get("PATH", "")
 import streamlit as st
 import json
 import os
