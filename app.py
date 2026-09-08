@@ -6,6 +6,7 @@ import json
 import os
 import re
 import hashlib
+import time
 import pandas as pd
 from typing import Any
 from google import genai
@@ -71,6 +72,19 @@ def fetch_available_gemini_models(api_key: str) -> list:
 # -----------------------------------------------------------------------------
 # Resilient Helpers & Safe API Callers
 # -----------------------------------------------------------------------------
+def wait_for_file_active(client, file_obj, timeout: int = 300, poll: float = 2.0):
+    """Polls the Files API until an uploaded file leaves PROCESSING."""
+    start = time.time()
+    while getattr(file_obj.state, "name", str(file_obj.state)) == "PROCESSING":
+        if time.time() - start > timeout:
+            raise TimeoutError(f"File {file_obj.name} still processing after {timeout}s")
+        time.sleep(poll)
+        file_obj = client.files.get(name=file_obj.name)
+    state = getattr(file_obj.state, "name", str(file_obj.state))
+    if state != "ACTIVE":
+        raise RuntimeError(f"File {file_obj.name} ended in state {state}")
+    return file_obj
+
 def safe_extract_text(res: Any) -> str:
     """Safely extracts text from Gemini API response objects."""
     if res is None:
@@ -412,6 +426,7 @@ with tab_pass1:
 
                             progress_bar.progress(float(idx) / float(len(chunks)), text=progress_text)
                             uploaded_chunk = client.files.upload(file=chunk_audio)
+                            uploaded_chunk = wait_for_file_active(client, uploaded_chunk)
                             
                             chunk_compact_tsv = TokenOptimizer.cues_to_compact_tsv(chunk_cues_df) if not chunk_cues_df.empty else "cue_id|start|end\n"
                             
