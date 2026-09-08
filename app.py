@@ -100,7 +100,7 @@ def safe_extract_text(res: Any) -> str:
     # 2. Iterate through candidates and parts
     if hasattr(res, "candidates") and res.candidates:
         candidate = res.candidates[0]
-        if hasattr(candidate, "content") and hasattr(candidate.content, "parts"):
+        if hasattr(candidate, "content") and getattr(candidate.content, "parts", None):
             text_parts = []
             for part in candidate.content.parts:
                 if hasattr(part, "text") and part.text:
@@ -453,8 +453,8 @@ with tab_pass1:
 
                             raw_res_text = safe_extract_text(res)
                             chunk_dict = parse_and_validate_pass1(raw_res_text)
-                            all_cues.extend(chunk_dict.get("cues", []))
-                            all_uncovered.extend(chunk_dict.get("uncovered_speech", []))
+                            all_cues.extend(chunk_dict.get("cues") or [])
+                            all_uncovered.extend(chunk_dict.get("uncovered_speech") or [])
 
                             if enable_chunking and chunk_audio != full_audio_path and os.path.exists(chunk_audio):
                                 try:
