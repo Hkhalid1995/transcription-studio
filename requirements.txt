@@ -4,4 +4,5 @@ json-repair>=0.30.0
 pandas>=2.0.0
 openpyxl>=3.1.0
 pydantic>=2.0.0
-python-dotenv>=1.0.0
+python-dotenv>=1.0.0static-ffmpeg
+static-ffmpeg
