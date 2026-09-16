@@ -391,7 +391,7 @@ with tab_ingest:
                 st.session_state.delivered_df = pd.read_excel(up_sub)
             st.success(f"✅ Loaded {len(st.session_state.delivered_df)} cue rows from `{up_sub.name}`.")
             with st.expander("Preview Ingested Data", expanded=False):
-                st.dataframe(st.session_state.delivered_df.head(10), use_container_width=True)
+                st.dataframe(st.session_state.delivered_df.head(10), width="stretch")
         except Exception as e:
             st.error(f"Error reading file: {e}")
 
@@ -416,7 +416,7 @@ with tab_pass1:
 
         col_p1, col_info = st.columns([1, 2])
         with col_p1:
-            run_p1 = st.button("🚀 Run Pass 1 Audio Gloss", type="primary", use_container_width=True)
+            run_p1 = st.button("🚀 Run Pass 1 Audio Gloss", type="primary", width="stretch")
         with col_info:
             if os.path.exists(cache_file):
                 st.info(f"⚡ Cached Pass 1 artifact found (`{cache_hash[:8]}`). Zero additional audio tokens needed.")
@@ -689,7 +689,7 @@ with tab_dashboard:
                 data=json.dumps(report, indent=2, ensure_ascii=False),
                 file_name=f"Transcription_QA_{video_ref_id}.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
         with dl_col2:
             flattened = []
@@ -715,5 +715,5 @@ with tab_dashboard:
                     data=csv_str,
                     file_name=f"Transcriber_Action_Sheet_{video_ref_id}.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    width="stretch"
                 )
