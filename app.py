@@ -3,7 +3,6 @@ import imageio_ffmpeg
 os.environ["PATH"] = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe()) + os.pathsep + os.environ.get("PATH", "")
 import streamlit as st
 import json
-import os
 import re
 import hashlib
 import time
@@ -116,7 +115,7 @@ def safe_extract_text(res: Any) -> str:
 
     return ""
 
-def clean_and_parse_json(raw_text: Any) -> dict:
+def clean_and_parse_json(raw_text: Any) -> Any:
     """Strips markdown code fences and auto-repairs malformed/truncated JSON."""
     if raw_text is None or not str(raw_text).strip():
         raise ValueError("The model returned an empty text response. Please verify your selected Model ID and API Key.")
@@ -132,22 +131,70 @@ def clean_and_parse_json(raw_text: Any) -> dict:
         repaired_str = repair_json(cleaned)
         return json.loads(repaired_str)
 
+def normalize_to_dict_pass1(parsed: Any) -> dict:
+    """Normalizes list or malformed responses into a valid Pass 1 dictionary."""
+    if isinstance(parsed, list):
+        if len(parsed) == 0:
+            return {"video_ref_id": "", "cues": [], "uncovered_speech": []}
+        # Case 1: Model wrapped the entire object in a list: [{ "video_ref_id": ..., "cues": ... }]
+        if isinstance(parsed[0], dict) and ("cues" in parsed[0] or "video_ref_id" in parsed[0]):
+            res = parsed[0]
+            if "cues" not in res:
+                res["cues"] = []
+            if "uncovered_speech" not in res:
+                res["uncovered_speech"] = []
+            return res
+        # Case 2: Model returned a direct list of cues: [{ "cue_id": 1, ... }, { "cue_id": 2, ... }]
+        elif isinstance(parsed[0], dict) and ("cue_id" in parsed[0] or "verbatim" in parsed[0]):
+            return {"video_ref_id": "", "cues": parsed, "uncovered_speech": []}
+    if isinstance(parsed, dict):
+        if "cues" not in parsed:
+            parsed["cues"] = []
+        if "uncovered_speech" not in parsed:
+            parsed["uncovered_speech"] = []
+        return parsed
+    return {"video_ref_id": "", "cues": [], "uncovered_speech": []}
+
+def normalize_to_dict_pass2(parsed: Any) -> dict:
+    """Normalizes list or malformed responses into a valid Pass 2 dictionary."""
+    if isinstance(parsed, list):
+        if len(parsed) == 0:
+            return {"video_ref_id": "", "summary": {}, "flagged_lines": []}
+        # Case 1: Wrapped in list: [{ "summary": ..., "flagged_lines": ... }]
+        if isinstance(parsed[0], dict) and ("summary" in parsed[0] or "flagged_lines" in parsed[0]):
+            res = parsed[0]
+            if "summary" not in res:
+                res["summary"] = {}
+            if "flagged_lines" not in res:
+                res["flagged_lines"] = []
+            return res
+        # Case 2: Direct list of flagged lines: [{ "cue_id": ..., "findings": ... }]
+        elif isinstance(parsed[0], dict) and ("cue_id" in parsed[0] or "findings" in parsed[0]):
+            return {"video_ref_id": "", "summary": {}, "flagged_lines": parsed}
+    if isinstance(parsed, dict):
+        if "summary" not in parsed:
+            parsed["summary"] = {}
+        if "flagged_lines" not in parsed:
+            parsed["flagged_lines"] = []
+        return parsed
+    return {"video_ref_id": "", "summary": {}, "flagged_lines": []}
+
 def parse_and_validate_pass1(raw_text: str) -> dict:
-    parsed = clean_and_parse_json(raw_text)
+    parsed_raw = clean_and_parse_json(raw_text)
+    parsed = normalize_to_dict_pass1(parsed_raw)
     try:
         validated = Pass1Output.model_validate(parsed)
         return validated.model_dump()
-    except Exception as val_err:
-        st.warning(f"⚠️ Pass 1 schema reconciled: {val_err}")
+    except Exception:
         return parsed
 
 def parse_and_validate_pass2(raw_text: str) -> dict:
-    parsed = clean_and_parse_json(raw_text)
+    parsed_raw = clean_and_parse_json(raw_text)
+    parsed = normalize_to_dict_pass2(parsed_raw)
     try:
         validated = Pass2Output.model_validate(parsed)
         return validated.model_dump()
-    except Exception as val_err:
-        st.warning(f"⚠️ Pass 2 schema reconciled: {val_err}")
+    except Exception:
         return parsed
 
 def call_gemini_safe(client, model: str, contents: list, system_instruction: str, temperature: float = 0.0, response_mime_type: str = "application/json"):
@@ -453,8 +500,8 @@ with tab_pass1:
 
                             raw_res_text = safe_extract_text(res)
                             chunk_dict = parse_and_validate_pass1(raw_res_text)
-                            all_cues.extend(chunk_dict.get("cues") or [])
-                            all_uncovered.extend(chunk_dict.get("uncovered_speech") or [])
+                            all_cues.extend(chunk_dict.get("cues", []) or [])
+                            all_uncovered.extend(chunk_dict.get("uncovered_speech", []) or [])
 
                             if enable_chunking and chunk_audio != full_audio_path and os.path.exists(chunk_audio):
                                 try:
